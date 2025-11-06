@@ -1,5 +1,5 @@
 // api/get-visits.js
-// Complete Vercel serverless function - handles everything server-side
+// Fixed version for Vercel serverless functions
 
 const DEVELOPER_ROLES = [
     'developer', 'builder', 'scripter', 'programmer',
@@ -7,7 +7,6 @@ const DEVELOPER_ROLES = [
     'game developer', 'lead scripter', 'head developer'
 ];
 
-// Simple in-memory cache (resets on cold start)
 const cache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
@@ -24,13 +23,12 @@ async function fetchJSON(url) {
     return response.json();
 }
 
-module.exports = async (req, res) => {
-    // CORS headers for Roblox
+export default async function handler(req, res) {
+    // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     
-    // Handle OPTIONS preflight
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
@@ -44,7 +42,6 @@ module.exports = async (req, res) => {
         });
     }
     
-    // Validate userId is a number
     if (!/^\d+$/.test(userId)) {
         return res.status(400).json({ error: 'Invalid userId - must be numeric' });
     }
@@ -54,7 +51,7 @@ module.exports = async (req, res) => {
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
         console.log(`Cache hit for user ${userId}`);
-        return res.json(cached.data);
+        return res.status(200).json(cached.data);
     }
     
     try {
@@ -66,7 +63,7 @@ module.exports = async (req, res) => {
         
         console.log(`Fetching data for user ${userId}...`);
         
-        // 1. Get user's personal games
+        // Get user's personal games
         try {
             const userGamesData = await fetchJSON(
                 `https://games.roblox.com/v2/users/${userId}/games?accessFilter=2&limit=50&sortOrder=Desc`
@@ -82,10 +79,9 @@ module.exports = async (req, res) => {
             }
         } catch (err) {
             console.error('Error fetching user games:', err.message);
-            // Continue anyway - user might just have no games
         }
         
-        // 2. Get user's group memberships
+        // Get user's group memberships
         let groups = [];
         try {
             const groupsData = await fetchJSON(
@@ -97,7 +93,7 @@ module.exports = async (req, res) => {
             console.error('Error fetching user groups:', err.message);
         }
         
-        // 3. Check each group for developer role and get games
+        // Check each group for developer role
         for (const groupData of groups) {
             const roleName = groupData.role.name;
             
@@ -153,21 +149,21 @@ module.exports = async (req, res) => {
             timestamp: Date.now()
         });
         
-        // Clean old cache entries (simple cleanup)
+        // Clean old cache entries
         if (cache.size > 100) {
             const firstKey = cache.keys().next().value;
             cache.delete(firstKey);
         }
         
-        res.json(result);
+        return res.status(200).json(result);
         
     } catch (error) {
         console.error('Fatal error:', error);
-        res.status(500).json({ 
+        return res.status(500).json({ 
             success: false,
             error: 'Failed to fetch visit data',
             details: error.message,
             userId: userId
         });
     }
-};
+}
