@@ -1,4 +1,8 @@
 {
   "name": "roblox-visit-counter",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=18.x"
+  }
 }
